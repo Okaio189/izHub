@@ -1,0 +1,131 @@
+local LSS = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+
+local Config = {
+    AutoHarvest = false,
+    AutoSell = false,
+    WalkSpeed = 16,
+    JumpPower = 50
+}
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "izHub_V1"
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Parent = ScreenGui
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Main.BorderSizePixel = 0
+Main.Position = UDim2.new(0.3, 0, 0.3, 0)
+Main.Size = UDim2.new(0, 400, 0, 300)
+Main.Active = true
+Main.Draggable = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = Main
+
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.Parent = Main
+Header.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Header.BorderSizePixel = 0
+Header.Size = UDim2.new(1, 0, 0, 45)
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 10)
+HeaderCorner.Parent = Header
+
+local Title = Instance.new("TextLabel")
+Title.Parent = Header
+Title.BackgroundTransparency = 1
+Title.Position = UDim2.new(0.05, 0, 0, 0)
+Title.Size = UDim2.new(0.9, 0, 1, 0)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "izHub - GARDEN HORIZONS"
+Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+Title.TextSize = 20
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local Container = Instance.new("ScrollingFrame")
+Container.Name = "Container"
+Container.Parent = Main
+Container.Active = true
+Container.BackgroundTransparency = 1
+Container.BorderSizePixel = 0
+Container.Position = UDim2.new(0, 10, 0, 55)
+Container.Size = UDim2.new(1, -20, 1, -65)
+Container.CanvasSize = UDim2.new(0, 0, 1.2, 0)
+Container.ScrollBarThickness = 3
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = Container
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 10)
+
+function createToggle(text, callback)
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Size = UDim2.new(1, 0, 0, 45)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    ToggleBtn.Font = Enum.Font.GothamSemibold
+    ToggleBtn.Text = text .. ": OFF"
+    ToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    ToggleBtn.TextSize = 14
+    ToggleBtn.Parent = Container
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 6)
+    Corner.Parent = ToggleBtn
+
+    local state = false
+    ToggleBtn.MouseButton1Click:Connect(function()
+        state = not state
+        ToggleBtn.Text = text .. ": " .. (state and "ON" or "OFF")
+        ToggleBtn.TextColor3 = state and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(200, 200, 200)
+        ToggleBtn.BackgroundColor3 = state and Color3.fromRGB(50, 60, 50) or Color3.fromRGB(45, 45, 45)
+        callback(state)
+    end)
+end
+
+-- THÊM CHỨC NĂNG
+createToggle("Auto Harvest All", function(v)
+    Config.AutoHarvest = v
+end)
+
+createToggle("Auto Sell All", function(v)
+    Config.AutoSell = v
+end)
+
+createToggle("Infinite Jump", function(v)
+    game:GetService("UserInputService").JumpRequest:Connect(function()
+        if v then LP.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping") end
+    end)
+end)
+
+-- LOGIC MÔ PHỎNG (Cần Remote Spy để lấy đúng tên Event)
+local harvestRemote = LSS:FindFirstChild("Harvest") or LSS:FindFirstChild("Collect")
+local sellRemote = LSS:FindFirstChild("SellAll") or LSS:FindFirstChild("RequestSell")
+
+task.spawn(function()
+    while true do
+        if Config.AutoHarvest then
+            pcall(function()
+                for _, obj in pairs(game.Workspace:GetDescendants()) do
+                    if obj.Name == "Fruit" and obj:FindFirstChild("Ripe") then
+                        harvestRemote:FireServer(obj)
+                    end
+                end
+            end)
+        end
+
+        if Config.AutoSell then
+            pcall(function()
+                sellRemote:FireServer()
+            end)
+        end
+        task.wait(0.5)
+    end
+end)

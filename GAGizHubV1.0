@@ -1,0 +1,512 @@
+```lua
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+local Config = {
+    AutoHarvest = true,
+    AutoSell = false,
+    HarvestDelay = 0.1,
+    CollectRange = 50,
+    HighlightFruits = true,
+}
+
+local Theme = {
+    BG      = Color3.fromRGB(10, 14, 20),
+    Surface = Color3.fromRGB(17, 24, 32),
+    Border  = Color3.fromRGB(30, 40, 55),
+    Primary = Color3.fromRGB(34, 197, 94),
+    Accent  = Color3.fromRGB(52, 211, 153),
+    Danger  = Color3.fromRGB(239, 68, 68),
+    Text    = Color3.fromRGB(230, 240, 255),
+    SubText = Color3.fromRGB(110, 130, 160),
+}
+
+local harvested = 0
+local Highlights = {}
+local running = true
+
+local function tween(obj, props, dur)
+    TweenService:Create(obj, TweenInfo.new(dur or 0.25, Enum.EasingStyle.Quart), props):Play()
+end
+
+local function make(class, props, parent)
+    local i = Instance.new(class)
+    for k, v in pairs(props) do i[k] = v end
+    if parent then i.Parent = parent end
+    return i
+end
+
+local function corner(r, p)
+    make("UICorner", { CornerRadius = UDim.new(0, r) }, p)
+end
+
+local ScreenGui = make("ScreenGui", {
+    Name = "izHub_UI",
+    ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    DisplayOrder = 999,
+}, LocalPlayer.PlayerGui)
+
+local Window = make("Frame", {
+    Size = UDim2.new(0, 340, 0, 460),
+    Position = UDim2.new(0.5, -170, 0.5, -230),
+    BackgroundColor3 = Theme.BG,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+}, ScreenGui)
+corner(14, Window)
+make("UIStroke", { Color = Theme.Border, Thickness = 1.5 }, Window)
+
+make("ImageLabel", {
+    Size = UDim2.new(1.6, 0, 1.6, 0),
+    Position = UDim2.new(-0.3, 0, -0.3, 0),
+    BackgroundTransparency = 1,
+    Image = "rbxasset://textures/ui/Controls/RadialFill.png",
+    ImageColor3 = Theme.Primary,
+    ImageTransparency = 0.88,
+    ZIndex = 0,
+}, Window)
+
+local TitleBar = make("Frame", {
+    Size = UDim2.new(1, 0, 0, 54),
+    BackgroundColor3 = Theme.Surface,
+    BorderSizePixel = 0,
+}, Window)
+corner(14, TitleBar)
+
+local Pill = make("Frame", {
+    Size = UDim2.new(0, 4, 0, 28),
+    Position = UDim2.new(0, 14, 0.5, -14),
+    BackgroundColor3 = Theme.Primary,
+    BorderSizePixel = 0,
+}, TitleBar)
+corner(99, Pill)
+
+make("TextLabel", {
+    Size = UDim2.new(0, 70, 1, 0),
+    Position = UDim2.new(0, 26, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "izHub",
+    Font = Enum.Font.GothamBold,
+    TextSize = 20,
+    TextColor3 = Theme.Text,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, TitleBar)
+
+make("TextLabel", {
+    Size = UDim2.new(0, 60, 1, 0),
+    Position = UDim2.new(0, 94, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "by Luau",
+    Font = Enum.Font.Gotham,
+    TextSize = 12,
+    TextColor3 = Theme.Accent,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, TitleBar)
+
+local VerBadge = make("TextLabel", {
+    Size = UDim2.new(0, 48, 0, 20),
+    Position = UDim2.new(1, -108, 0.5, -10),
+    BackgroundColor3 = Theme.Border,
+    Text = "v1.0.0",
+    Font = Enum.Font.GothamBold,
+    TextSize = 10,
+    TextColor3 = Theme.SubText,
+    BorderSizePixel = 0,
+}, TitleBar)
+corner(99, VerBadge)
+
+local MinBtn = make("TextButton", {
+    Size = UDim2.new(0, 28, 0, 28),
+    Position = UDim2.new(1, -42, 0.5, -14),
+    BackgroundColor3 = Theme.Border,
+    Text = "−",
+    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    TextColor3 = Theme.Text,
+    BorderSizePixel = 0,
+}, TitleBar)
+corner(6, MinBtn)
+
+local minimized = false
+local ContentFrame = make("Frame", {
+    Size = UDim2.new(1, 0, 1, -54),
+    Position = UDim2.new(0, 0, 0, 54),
+    BackgroundTransparency = 1,
+    ClipsDescendants = true,
+}, Window)
+
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    tween(Window, { Size = minimized and UDim2.new(0, 340, 0, 54) or UDim2.new(0, 340, 0, 460) }, 0.3)
+    MinBtn.Text = minimized and "+" or "−"
+end)
+
+local StatusBar = make("Frame", {
+    Size = UDim2.new(1, -28, 0, 36),
+    Position = UDim2.new(0, 14, 0, 8),
+    BackgroundColor3 = Theme.Surface,
+    BorderSizePixel = 0,
+}, ContentFrame)
+corner(10, StatusBar)
+
+local StatusDot = make("Frame", {
+    Size = UDim2.new(0, 8, 0, 8),
+    Position = UDim2.new(0, 12, 0.5, -4),
+    BackgroundColor3 = Theme.Primary,
+    BorderSizePixel = 0,
+}, StatusBar)
+corner(99, StatusDot)
+
+local StatusLabel = make("TextLabel", {
+    Size = UDim2.new(1, -100, 1, 0),
+    Position = UDim2.new(0, 26, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "Auto-Harvest Active",
+    Font = Enum.Font.Gotham,
+    TextSize = 12,
+    TextColor3 = Theme.SubText,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, StatusBar)
+
+local CountLabel = make("TextLabel", {
+    Size = UDim2.new(0, 80, 1, 0),
+    Position = UDim2.new(1, -84, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "0 harvested",
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    TextColor3 = Theme.Accent,
+    TextXAlignment = Enum.TextXAlignment.Right,
+}, StatusBar)
+
+local Scroll = make("ScrollingFrame", {
+    Size = UDim2.new(1, -28, 0, 280),
+    Position = UDim2.new(0, 14, 0, 52),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = Theme.Border,
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+}, ContentFrame)
+
+make("UIListLayout", {
+    Padding = UDim.new(0, 8),
+    SortOrder = Enum.SortOrder.LayoutOrder,
+}, Scroll)
+
+local function createToggle(label, desc, icon, default, callback)
+    local val = default
+    local Row = make("Frame", {
+        Size = UDim2.new(1, 0, 0, 64),
+        BackgroundColor3 = Theme.Surface,
+        BorderSizePixel = 0,
+    }, Scroll)
+    corner(10, Row)
+
+    local Bubble = make("Frame", {
+        Size = UDim2.new(0, 36, 0, 36),
+        Position = UDim2.new(0, 12, 0.5, -18),
+        BackgroundColor3 = Theme.Border,
+        BorderSizePixel = 0,
+    }, Row)
+    corner(10, Bubble)
+
+    make("TextLabel", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = icon,
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        TextColor3 = Theme.Text,
+    }, Bubble)
+
+    make("TextLabel", {
+        Size = UDim2.new(1, -120, 0, 20),
+        Position = UDim2.new(0, 58, 0, 13),
+        BackgroundTransparency = 1,
+        Text = label,
+        Font = Enum.Font.GothamBold,
+        TextSize = 13,
+        TextColor3 = Theme.Text,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, Row)
+
+    make("TextLabel", {
+        Size = UDim2.new(1, -120, 0, 16),
+        Position = UDim2.new(0, 58, 0, 34),
+        BackgroundTransparency = 1,
+        Text = desc,
+        Font = Enum.Font.Gotham,
+        TextSize = 11,
+        TextColor3 = Theme.SubText,
+        TextXAlignment = Enum.TextXAlignment.Left,
+    }, Row)
+
+    local PillBG = make("Frame", {
+        Size = UDim2.new(0, 44, 0, 24),
+        Position = UDim2.new(1, -56, 0.5, -12),
+        BackgroundColor3 = val and Theme.Primary or Theme.Border,
+        BorderSizePixel = 0,
+    }, Row)
+    corner(99, PillBG)
+
+    local Knob = make("Frame", {
+        Size = UDim2.new(0, 18, 0, 18),
+        Position = val and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+        BorderSizePixel = 0,
+    }, PillBG)
+    corner(99, Knob)
+
+    local Btn = make("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+    }, Row)
+
+    Btn.MouseButton1Click:Connect(function()
+        val = not val
+        tween(PillBG, { BackgroundColor3 = val and Theme.Primary or Theme.Border }, 0.2)
+        tween(Knob, { Position = val and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9) }, 0.2)
+        if callback then callback(val) end
+    end)
+
+    Btn.MouseEnter:Connect(function() tween(Row, { BackgroundColor3 = Color3.fromRGB(22, 32, 44) }, 0.15) end)
+    Btn.MouseLeave:Connect(function() tween(Row, { BackgroundColor3 = Theme.Surface }, 0.15) end)
+end
+
+createToggle("Auto Harvest", "Collect fruits automatically", "🌿", true, function(v)
+    Config.AutoHarvest = v
+    StatusLabel.Text = v and "Auto-Harvest Active" or "Auto-Harvest Paused"
+    tween(StatusDot, { BackgroundColor3 = v and Theme.Primary or Theme.Danger }, 0.2)
+end)
+
+createToggle("Auto Sell", "Sell harvested fruits instantly", "💰", false, function(v)
+    Config.AutoSell = v
+end)
+
+createToggle("Highlight Fruits", "ESP on nearby fruits", "🔆", true, function(v)
+    Config.HighlightFruits = v
+    if not v then
+        for _, h in pairs(Highlights) do if h and h.Parent then h:Destroy() end end
+        Highlights = {}
+    end
+end)
+
+local SliderRow = make("Frame", {
+    Size = UDim2.new(1, 0, 0, 64),
+    BackgroundColor3 = Theme.Surface,
+    BorderSizePixel = 0,
+}, Scroll)
+corner(10, SliderRow)
+
+local SBubble = make("Frame", {
+    Size = UDim2.new(0, 36, 0, 36),
+    Position = UDim2.new(0, 12, 0.5, -18),
+    BackgroundColor3 = Theme.Border,
+    BorderSizePixel = 0,
+}, SliderRow)
+corner(10, SBubble)
+make("TextLabel", { Size = UDim2.new(1,0,1,0), BackgroundTransparency=1, Text="⏱", Font=Enum.Font.GothamBold, TextSize=18, TextColor3=Theme.Text }, SBubble)
+
+make("TextLabel", {
+    Size = UDim2.new(1,-130,0,20), Position = UDim2.new(0,58,0,10),
+    BackgroundTransparency=1, Text="Harvest Delay", Font=Enum.Font.GothamBold,
+    TextSize=13, TextColor3=Theme.Text, TextXAlignment=Enum.TextXAlignment.Left,
+}, SliderRow)
+
+local DelayVal = make("TextLabel", {
+    Size = UDim2.new(0,40,0,20), Position = UDim2.new(1,-52,0,10),
+    BackgroundTransparency=1, Text="0.1s", Font=Enum.Font.GothamBold,
+    TextSize=12, TextColor3=Theme.Accent, TextXAlignment=Enum.TextXAlignment.Right,
+}, SliderRow)
+
+local Track = make("Frame", {
+    Size = UDim2.new(1,-70,0,6), Position = UDim2.new(0,58,0,44),
+    BackgroundColor3=Theme.Border, BorderSizePixel=0,
+}, SliderRow)
+corner(99, Track)
+
+local Fill = make("Frame", { Size=UDim2.new(0.05,0,1,0), BackgroundColor3=Theme.Primary, BorderSizePixel=0 }, Track)
+corner(99, Fill)
+
+local SKnob = make("Frame", {
+    Size=UDim2.new(0,14,0,14), Position=UDim2.new(0.05,-7,0.5,-7),
+    BackgroundColor3=Color3.fromRGB(255,255,255), BorderSizePixel=0,
+}, Track)
+corner(99, SKnob)
+
+local dragging = false
+SKnob.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+UserInputService.InputChanged:Connect(function(i)
+    if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
+        local pct = math.clamp((i.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+        Config.HarvestDelay = math.floor(pct * 20) / 10
+        DelayVal.Text = Config.HarvestDelay .. "s"
+        tween(Fill, { Size=UDim2.new(pct,0,1,0) }, 0.05)
+        tween(SKnob, { Position=UDim2.new(pct,-7,0.5,-7) }, 0.05)
+    end
+end)
+
+local ActionBar = make("Frame", {
+    Size = UDim2.new(1,-28,0,42),
+    Position = UDim2.new(0,14,1,-52),
+    BackgroundColor3 = Theme.Surface,
+    BorderSizePixel = 0,
+}, ContentFrame)
+corner(10, ActionBar)
+
+local function makeBtn(txt, color, xScale, xOffset, cb)
+    local b = make("TextButton", {
+        Size = UDim2.new(xScale,-4,0,30),
+        Position = UDim2.new(xOffset,4,0.5,-15),
+        BackgroundColor3 = color,
+        Text = txt,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        TextColor3 = Color3.fromRGB(255,255,255),
+        BorderSizePixel = 0,
+    }, ActionBar)
+    corner(8, b)
+    b.MouseButton1Click:Connect(cb)
+    b.MouseEnter:Connect(function() tween(b,{BackgroundTransparency=0.2},0.15) end)
+    b.MouseLeave:Connect(function() tween(b,{BackgroundTransparency=0},0.15) end)
+    return b
+end
+
+makeBtn("⏹ Stop", Theme.Danger, 0.33, 0, function()
+    running = false
+    StatusLabel.Text = "Stopped"
+    tween(StatusDot, { BackgroundColor3 = Theme.Danger }, 0.2)
+end)
+
+makeBtn("▶ Start", Theme.Primary, 0.33, 0.33, function()
+    running = true
+    Config.AutoHarvest = true
+    StatusLabel.Text = "Auto-Harvest Active"
+    tween(StatusDot, { BackgroundColor3 = Theme.Primary }, 0.2)
+end)
+
+makeBtn("✕ Close", Theme.Border, 0.34, 0.66, function()
+    ScreenGui:Destroy()
+    running = false
+end)
+
+local draggingWindow, dragStart, startPos
+TitleBar.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingWindow = true
+        dragStart = i.Position
+        startPos = Window.Position
+    end
+end)
+UserInputService.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingWindow = false end
+end)
+UserInputService.InputChanged:Connect(function(i)
+    if draggingWindow and i.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = i.Position - dragStart
+        Window.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+local HarvestRemote = ReplicatedStorage:FindFirstChild("HarvestFruit")
+    or ReplicatedStorage:FindFirstChild("Collect")
+    or ReplicatedStorage:FindFirstChild("PickFruit")
+
+local function tryHarvest(obj)
+    if HarvestRemote then
+        HarvestRemote:FireServer(obj)
+        return true
+    end
+    local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then
+        fireproximityprompt(prompt)
+        return true
+    end
+    local part = obj:IsA("BasePart") and obj or (obj:IsA("Model") and obj.PrimaryPart)
+    if part and RootPart then
+        firetouchinterest(RootPart, part, 0)
+        task.wait(0.05)
+        firetouchinterest(RootPart, part, 1)
+        return true
+    end
+    return false
+end
+
+local function clearHighlights()
+    for _, h in pairs(Highlights) do if h and h.Parent then h:Destroy() end end
+    Highlights = {}
+end
+
+local function highlightFruit(obj)
+    if not Config.HighlightFruits or Highlights[obj] then return end
+    local h = make("SelectionBox", {
+        Adornee = obj,
+        Color3 = Theme.Primary,
+        LineThickness = 0.05,
+        SurfaceTransparency = 0.6,
+        SurfaceColor3 = Theme.Accent,
+    }, workspace)
+    Highlights[obj] = h
+end
+
+local FRUIT_KEYS = {
+    "fruit","berry","apple","mango","grape","orange",
+    "harvest","crop","plant","flower","strawberry",
+    "watermelon","pineapple","banana","peach","lemon",
+}
+
+local function isFruit(name)
+    name = name:lower()
+    for _, k in ipairs(FRUIT_KEYS) do
+        if name:find(k) then return true end
+    end
+    return false
+end
+
+task.spawn(function()
+    while running do
+        task.wait(Config.HarvestDelay)
+        if not Config.AutoHarvest then task.wait(0.5) continue end
+
+        Character = LocalPlayer.Character
+        if not Character then task.wait(1) continue end
+        RootPart = Character:FindFirstChild("HumanoidRootPart")
+        if not RootPart then task.wait(1) continue end
+
+        clearHighlights()
+
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if not running or not Config.AutoHarvest then break end
+            if isFruit(obj.Name) and (obj:IsA("Model") or obj:IsA("BasePart")) then
+                local part = obj:IsA("Model") and obj.PrimaryPart or obj
+                if part then
+                    local dist = (RootPart.Position - part.Position).Magnitude
+                    if dist <= Config.CollectRange then
+                        highlightFruit(obj)
+                        if tryHarvest(obj) then
+                            harvested += 1
+                            CountLabel.Text = harvested .. " harvested"
+                        end
+                    end
+                end
+            end
+            task.wait()
+        end
+    end
+end)
+```

@@ -1,1 +1,351 @@
+--!strict
+-- Aim Assist Simulation (All-in-One LocalScript)
+-- Put in StarterPlayerScripts
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- =====================
+-- Config
+-- =====================
+local Config = {
+	Enabled = false,
+	FOV = 170,                -- pixel radius from screen center
+	Smoothness = 0.18,        -- 0.01 -> 1
+	MaxDistance = 350,        -- studs
+	RequireLineOfSight = true,
+	TargetPartName = "Head",  -- fallback -> HumanoidRootPart
+	TeamCheck = true,         -- only target other teams if possible
+	ShowFOVCircle = true,
+}
+
+-- =====================
+-- Helpers
+-- =====================
+local function getCharacter(player: Player): Model?
+	return player.Character
+end
+
+local function getHumanoid(model: Model): Humanoid?
+	return model:FindFirstChildOfClass("Humanoid")
+end
+
+local function getRoot(model: Model): BasePart?
+	return model:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+local function isAlive(model: Model): boolean
+	local hum = getHumanoid(model)
+	local root = getRoot(model)
+	return hum ~= nil and root ~= nil and hum.Health > 0
+end
+
+local function isEnemy(player: Player): boolean
+	if player == LocalPlayer then
+		return false
+	end
+
+	if not Config.TeamCheck then
+		return true
+	end
+
+	-- If Teams are used, skip same-team players
+	if LocalPlayer.Team ~= nil and player.Team ~= nil then
+		return LocalPlayer.Team ~= player.Team
+	end
+
+	-- If no team system, allow targeting
+	return true
+end
+
+local function hasLineOfSight(targetPart: BasePart, myCharacter: Model): boolean
+	if not Config.RequireLineOfSight then
+		return true
+	end
+
+	local origin = Camera.CFrame.Position
+	local direction = targetPart.Position - origin
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = {myCharacter, Camera}
+	params.IgnoreWater = true
+
+	local result = Workspace:Raycast(origin, direction, params)
+	if not result then
+		return true
+	end
+
+	-- If ray hits target character, still visible
+	return result.Instance:IsDescendantOf(targetPart.Parent)
+end
+
+local function getBestTargetPart(): BasePart?
+	local myChar = getCharacter(LocalPlayer)
+	if not myChar or not isAlive(myChar) then
+		return nil
+	end
+
+	local myRoot = getRoot(myChar)
+	if not myRoot then
+		return nil
+	end
+
+	local viewportCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	local bestPart: BasePart? = nil
+	local bestScore = math.huge
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if isEnemy(plr) then
+			local char = getCharacter(plr)
+			if char and isAlive(char) then
+				local targetPart = char:FindFirstChild(Config.TargetPartName) :: BasePart?
+				if not targetPart then
+					targetPart = getRoot(char)
+				end
+
+				if targetPart then
+					local dist = (targetPart.Position - myRoot.Position).Magnitude
+					if dist <= Config.MaxDistance then
+						local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+						if onScreen then
+							local delta = Vector2.new(screenPos.X, screenPos.Y) - viewportCenter
+							local pixelDist = delta.Magnitude
+
+							if pixelDist <= Config.FOV and hasLineOfSight(targetPart, myChar) then
+								if pixelDist < bestScore then
+									bestScore = pixelDist
+									bestPart = targetPart
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	return bestPart
+end
+
+local function aimStep(dt: number)
+	if not Config.Enabled then
+		return
+	end
+
+	local targetPart = getBestTargetPart()
+	if not targetPart then
+		return
+	end
+
+	local camPos = Camera.CFrame.Position
+	local desired = CFrame.lookAt(camPos, targetPart.Position)
+	local alpha = math.clamp(Config.Smoothness * dt * 60, 0, 1)
+
+	Camera.CFrame = Camera.CFrame:Lerp(desired, alpha)
+end
+
+-- =====================
+-- UI
+-- =====================
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "AimAssistUI"
+gui.ResetOnSpawn = false
+gui.Parent = playerGui
+
+local frame = Instance.new("Frame")
+frame.Name = "Panel"
+frame.Size = UDim2.fromOffset(280, 210)
+frame.Position = UDim2.fromScale(0.03, 0.25)
+frame.BackgroundColor3 = Color3.fromRGB(22, 26, 38)
+frame.BorderSizePixel = 0
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(88, 126, 255)
+stroke.Thickness = 1.2
+stroke.Transparency = 0.1
+stroke.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -16, 0, 30)
+title.Position = UDim2.fromOffset(8, 6)
+title.BackgroundTransparency = 1
+title.Text = "Aim Assist Simulation"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(235, 239, 255)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -16, 1, -44)
+content.Position = UDim2.fromOffset(8, 36)
+content.BackgroundTransparency = 1
+content.Parent = frame
+
+local list = Instance.new("UIListLayout")
+list.Padding = UDim.new(0, 8)
+list.Parent = content
+list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+list.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local function mkButton(text: string, color: Color3, h: number?): TextButton
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1, 0, 0, h or 36)
+	b.BackgroundColor3 = color
+	b.BorderSizePixel = 0
+	b.Text = text
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 14
+	b.TextColor3 = Color3.new(1, 1, 1)
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+	b.Parent = content
+	return b
+end
+
+local function mkRow(labelText: string, defaultText: string): TextBox
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 34)
+	row.BackgroundColor3 = Color3.fromRGB(32, 36, 52)
+	row.BorderSizePixel = 0
+	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+	row.Parent = content
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(0.55, -8, 1, 0)
+	label.Position = UDim2.fromOffset(10, 0)
+	label.BackgroundTransparency = 1
+	label.Text = labelText
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 13
+	label.TextColor3 = Color3.fromRGB(222, 228, 248)
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = row
+
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(0.4, 0, 0.74, 0)
+	box.AnchorPoint = Vector2.new(1, 0.5)
+	box.Position = UDim2.new(1, -8, 0.5, 0)
+	box.BackgroundColor3 = Color3.fromRGB(16, 20, 30)
+	box.BorderSizePixel = 0
+	box.ClearTextOnFocus = false
+	box.Text = defaultText
+	box.Font = Enum.Font.GothamSemibold
+	box.TextSize = 13
+	box.TextColor3 = Color3.fromRGB(245, 246, 255)
+	Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
+	box.Parent = row
+
+	return box
+end
+
+local aimBtn = mkButton("AIM: OFF", Color3.fromRGB(64, 98, 255), 38)
+local teamBtn = mkButton("TEAM CHECK: ON", Color3.fromRGB(45, 52, 74), 34)
+local losBtn = mkButton("LINE OF SIGHT: ON", Color3.fromRGB(45, 52, 74), 34)
+
+local fovBox = mkRow("FOV (px)", tostring(Config.FOV))
+local smoothBox = mkRow("Smooth (0-1)", tostring(Config.Smoothness))
+local distBox = mkRow("Max Distance", tostring(Config.MaxDistance))
+
+local function refreshAimBtn()
+	if Config.Enabled then
+		aimBtn.Text = "AIM: ON"
+		aimBtn.BackgroundColor3 = Color3.fromRGB(43, 182, 112)
+	else
+		aimBtn.Text = "AIM: OFF"
+		aimBtn.BackgroundColor3 = Color3.fromRGB(64, 98, 255)
+	end
+end
+
+local function clampNumberBox(box: TextBox, old: number, minV: number, maxV: number): number
+	local n = tonumber(box.Text)
+	if not n then
+		box.Text = tostring(old)
+		return old
+	end
+	n = math.clamp(n, minV, maxV)
+	local rounded = math.floor(n * 1000) / 1000
+	box.Text = tostring(rounded)
+	return rounded
+end
+
+aimBtn.MouseButton1Click:Connect(function()
+	Config.Enabled = not Config.Enabled
+	refreshAimBtn()
+end)
+
+teamBtn.MouseButton1Click:Connect(function()
+	Config.TeamCheck = not Config.TeamCheck
+	teamBtn.Text = "TEAM CHECK: " .. (Config.TeamCheck and "ON" or "OFF")
+end)
+
+losBtn.MouseButton1Click:Connect(function()
+	Config.RequireLineOfSight = not Config.RequireLineOfSight
+	losBtn.Text = "LINE OF SIGHT: " .. (Config.RequireLineOfSight and "ON" or "OFF")
+end)
+
+fovBox.FocusLost:Connect(function()
+	Config.FOV = clampNumberBox(fovBox, Config.FOV, 20, 800)
+end)
+
+smoothBox.FocusLost:Connect(function()
+	Config.Smoothness = clampNumberBox(smoothBox, Config.Smoothness, 0.01, 1)
+end)
+
+distBox.FocusLost:Connect(function()
+	Config.MaxDistance = clampNumberBox(distBox, Config.MaxDistance, 20, 2500)
+end)
+
+refreshAimBtn()
+
+-- Toggle panel visibility
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.RightShift then
+		frame.Visible = not frame.Visible
+	end
+end)
+
+-- =====================
+-- Optional FOV Circle (UI)
+-- =====================
+local fovCircle = Instance.new("Frame")
+fovCircle.Name = "FOVCircle"
+fovCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+fovCircle.Position = UDim2.fromScale(0.5, 0.5)
+fovCircle.Size = UDim2.fromOffset(Config.FOV * 2, Config.FOV * 2)
+fovCircle.BackgroundTransparency = 1
+fovCircle.Visible = Config.ShowFOVCircle
+fovCircle.Parent = gui
+
+local fovStroke = Instance.new("UIStroke")
+fovStroke.Color = Color3.fromRGB(100, 140, 255)
+fovStroke.Thickness = 1.5
+fovStroke.Transparency = 0.2
+fovStroke.Parent = fovCircle
+
+local fovCorner = Instance.new("UICorner")
+fovCorner.CornerRadius = UDim.new(1, 0)
+fovCorner.Parent = fovCircle
+
+RunService.RenderStepped:Connect(function(dt)
+	-- keep FOV circle updated
+	if Config.ShowFOVCircle then
+		local d = math.floor(Config.FOV * 2)
+		fovCircle.Size = UDim2.fromOffset(d, d)
+		fovCircle.Visible = true
+	else
+		fovCircle.Visible = false
+	end
+
+	aimStep(dt)
+end)

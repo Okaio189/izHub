@@ -17,24 +17,29 @@ local top=Instance.new("Frame",f)
 top.Size,top.BackgroundColor3,top.BorderSizePixel=UDim2.new(1,0,0,40),Color3.fromRGB(10,14,22),0
 local topCr=Instance.new("UICorner",top) topCr.CornerRadius=UDim.new(0,10)
 
--- Cyber Eye Logo (Custom Unique Vector)
-local eyeContainer=Instance.new("Frame",top)
-eyeContainer.Size,eyeContainer.Position,eyeContainer.BackgroundTransparency=UDim2.new(0,26,0,26),UDim2.new(0,10,0,7),1
+-- Logo Khung Thoi "IZ" (Stylized Diamond Emblem từ hình vẽ)
+local logoContainer=Instance.new("Frame",top)
+logoContainer.Size,logoContainer.Position,logoContainer.BackgroundTransparency=UDim2.new(0,26,0,26),UDim2.new(0,10,0,7),1
 
-local eyeOuter=Instance.new("Frame",eyeContainer)
-eyeOuter.Size,eyeOuter.Position,eyeOuter.BackgroundColor3,eyeOuter.Rotation=UDim2.new(0,18,0,18),UDim2.new(0,4,0,4),Color3.fromRGB(0,140,255),45
-local eyeOuterCr=Instance.new("UICorner",eyeOuter) eyeOuterCr.CornerRadius=UDim.new(0,4)
+local diaBorder=Instance.new("Frame",logoContainer)
+diaBorder.Size,diaBorder.Position,diaBorder.BackgroundColor3,diaBorder.Rotation=UDim2.new(0,18,0,18),UDim2.new(0,4,0,4),Color3.fromRGB(0,140,255),45
+local diaBorderCr=Instance.new("UICorner",diaBorder) diaBorderCr.CornerRadius=UDim.new(0,3)
 
-local eyeInner=Instance.new("Frame",eyeOuter)
-eyeInner.Size,eyeInner.Position,eyeInner.BackgroundColor3=UDim2.new(0,12,0,12),UDim2.new(0,3,0,3),Color3.fromRGB(10,14,22)
-local eyeInnerCr=Instance.new("UICorner",eyeInner) eyeInnerCr.CornerRadius=UDim.new(0,3)
+local diaInner=Instance.new("Frame",diaBorder)
+diaInner.Size,diaInner.Position,diaInner.BackgroundColor3=UDim2.new(0,14,0,14),UDim2.new(0,2,0,2),Color3.fromRGB(10,14,22)
+local diaInnerCr=Instance.new("UICorner",diaInner) diaInnerCr.CornerRadius=UDim.new(0,2)
 
-local eyePupil=Instance.new("Frame",eyeInner)
-eyePupil.Size,eyePupil.Position,eyePupil.BackgroundColor3=UDim2.new(0,6,0,6),UDim2.new(0,3,0,3),Color3.fromRGB(0,220,255)
-local eyePupilCr=Instance.new("UICorner",eyePupil) eyePupilCr.CornerRadius=UDim.new(1,0)
+-- Chữ "i" và "z" cách điệu bên trong khung thoi
+local izText=Instance.new("TextLabel",logoContainer)
+izText.Size,izText.Position,izText.BackgroundTransparency=UDim2.new(1,0,1,0),UDim2.new(0,0,0,0),1
+izText.Text="iz"
+izText.TextColor3=Color3.fromRGB(0,200,255)
+izText.Font=Enum.Font.GothamBlack
+izText.TextSize=14
+izText.ZIndex=3
 
 local t=Instance.new("TextLabel",top)
-t.Size,t.Position,t.BackgroundTransparency,t.Text,t.TextColor3,t.Font,t.TextSize=UDim2.new(1,-80,1,0),UDim2.new(0,42,0,0),1,"izHub",Color3.fromRGB(0,170,255),Enum.Font.GothamBold,15
+t.Size,t.Position,t.BackgroundTransparency,t.Text,t.TextColor3,t.Font,t.TextSize=UDim2.new(1,-80,1,0),UDim2.new(0,44,0,0),1,"izHub",Color3.fromRGB(0,170,255),Enum.Font.GothamBold,15
 t.TextXAlignment=Enum.TextXAlignment.Left
 
 local minBtn=Instance.new("TextButton",top)

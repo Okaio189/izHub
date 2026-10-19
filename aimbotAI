@@ -1,6 +1,6 @@
---!strict
--- Aim Assist Simulation (All-in-One LocalScript)
--- Put in StarterPlayerScripts
+--This file created by AI
+--Some feature may not working
+--I'm newbie and not good at code:)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -15,7 +15,7 @@ local Camera = Workspace.CurrentCamera
 -- =====================
 local Config = {
 	Enabled = false,
-	FOV = 170,                -- pixel radius from screen center
+	FOV = 170,              -- pixel radius from screen center
 	Smoothness = 0.18,        -- 0.01 -> 1
 	MaxDistance = 350,        -- studs
 	RequireLineOfSight = true,
@@ -54,12 +54,10 @@ local function isEnemy(player: Player): boolean
 		return true
 	end
 
-	-- If Teams are used, skip same-team players
 	if LocalPlayer.Team ~= nil and player.Team ~= nil then
 		return LocalPlayer.Team ~= player.Team
 	end
 
-	-- If no team system, allow targeting
 	return true
 end
 
@@ -81,7 +79,6 @@ local function hasLineOfSight(targetPart: BasePart, myCharacter: Model): boolean
 		return true
 	end
 
-	-- If ray hits target character, still visible
 	return result.Instance:IsDescendantOf(targetPart.Parent)
 end
 
@@ -158,15 +155,19 @@ local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local gui = Instance.new("ScreenGui")
 gui.Name = "AimAssistUI"
 gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = playerGui
 
 local frame = Instance.new("Frame")
 frame.Name = "Panel"
-frame.Size = UDim2.fromOffset(280, 210)
+frame.Size = UDim2.fromOffset(280, 270) -- Tăng chiều cao để không bị tràn nút
 frame.Position = UDim2.fromScale(0.03, 0.25)
 frame.BackgroundColor3 = Color3.fromRGB(22, 26, 38)
 frame.BorderSizePixel = 0
+frame.Active = true -- Cho phép nhận sự kiện chuột
 frame.Parent = gui
+
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
 local stroke = Instance.new("UIStroke")
@@ -193,20 +194,21 @@ content.BackgroundTransparency = 1
 content.Parent = frame
 
 local list = Instance.new("UIListLayout")
-list.Padding = UDim.new(0, 8)
+list.Padding = UDim.new(0, 6)
 list.Parent = content
 list.HorizontalAlignment = Enum.HorizontalAlignment.Center
 list.VerticalAlignment = Enum.VerticalAlignment.Top
 
 local function mkButton(text: string, color: Color3, h: number?): TextButton
 	local b = Instance.new("TextButton")
-	b.Size = UDim2.new(1, 0, 0, h or 36)
+	b.Size = UDim2.new(1, 0, 0, h or 34)
 	b.BackgroundColor3 = color
 	b.BorderSizePixel = 0
 	b.Text = text
 	b.Font = Enum.Font.GothamBold
 	b.TextSize = 14
 	b.TextColor3 = Color3.new(1, 1, 1)
+	b.AutoButtonColor = true
 	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
 	b.Parent = content
 	return b
@@ -214,7 +216,7 @@ end
 
 local function mkRow(labelText: string, defaultText: string): TextBox
 	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, 0, 0, 34)
+	row.Size = UDim2.new(1, 0, 0, 32)
 	row.BackgroundColor3 = Color3.fromRGB(32, 36, 52)
 	row.BorderSizePixel = 0
 	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
@@ -248,9 +250,9 @@ local function mkRow(labelText: string, defaultText: string): TextBox
 	return box
 end
 
-local aimBtn = mkButton("AIM: OFF", Color3.fromRGB(64, 98, 255), 38)
-local teamBtn = mkButton("TEAM CHECK: ON", Color3.fromRGB(45, 52, 74), 34)
-local losBtn = mkButton("LINE OF SIGHT: ON", Color3.fromRGB(45, 52, 74), 34)
+local aimBtn = mkButton("AIM: OFF", Color3.fromRGB(64, 98, 255), 36)
+local teamBtn = mkButton("TEAM CHECK: ON", Color3.fromRGB(45, 52, 74), 32)
+local losBtn = mkButton("LINE OF SIGHT: ON", Color3.fromRGB(45, 52, 74), 32)
 
 local fovBox = mkRow("FOV (px)", tostring(Config.FOV))
 local smoothBox = mkRow("Smooth (0-1)", tostring(Config.Smoothness))
@@ -307,7 +309,7 @@ end)
 
 refreshAimBtn()
 
--- Toggle panel visibility
+-- Toggle panel visibility bằng phím RightShift
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then return end
 	if input.KeyCode == Enum.KeyCode.RightShift then
@@ -338,7 +340,6 @@ fovCorner.CornerRadius = UDim.new(1, 0)
 fovCorner.Parent = fovCircle
 
 RunService.RenderStepped:Connect(function(dt)
-	-- keep FOV circle updated
 	if Config.ShowFOVCircle then
 		local d = math.floor(Config.FOV * 2)
 		fovCircle.Size = UDim2.fromOffset(d, d)

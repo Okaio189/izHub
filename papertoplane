@@ -1,0 +1,132 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+if playerGui:FindFirstChild("izHub") then
+	playerGui.izHub:Destroy()
+end
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "izHub"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+local openButton = Instance.new("TextButton")
+openButton.Name = "OpenButton"
+openButton.Size = UDim2.new(0, 100, 0, 36)
+openButton.Position = UDim2.new(0, 15, 0.5, -18)
+openButton.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+openButton.BorderColor3 = Color3.fromRGB(30, 100, 200)
+openButton.BorderSizePixel = 2
+openButton.Text = "izHub"
+openButton.TextColor3 = Color3.fromRGB(100, 180, 255)
+openButton.Font = Enum.Font.GothamBold
+openButton.TextSize = 14
+openButton.Parent = screenGui
+local openCorner = Instance.new("UICorner")
+openCorner.CornerRadius = UDim.new(0, 8)
+openCorner.Parent = openButton
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 260, 0, 180)
+mainFrame.Position = UDim2.new(0.5, -130, 0.5, -90)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 16, 28)
+mainFrame.BorderSizePixel = 0
+mainFrame.Visible = false
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(28, 85, 175)
+mainStroke.Thickness = 1.5
+mainStroke.Parent = mainFrame
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "Title"
+titleLabel.Size = UDim2.new(1, 0, 0, 38)
+titleLabel.BackgroundColor3 = Color3.fromRGB(15, 26, 46)
+titleLabel.BorderSizePixel = 0
+titleLabel.Text = "  izHub | Paper to Plane"
+titleLabel.TextColor3 = Color3.fromRGB(130, 195, 255)
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextSize = 14
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = mainFrame
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = titleLabel
+local autoThrowBtn = Instance.new("TextButton")
+autoThrowBtn.Name = "AutoThrowButton"
+autoThrowBtn.Size = UDim2.new(0.86, 0, 0, 42)
+autoThrowBtn.Position = UDim2.new(0.07, 0, 0, 55)
+autoThrowBtn.BackgroundColor3 = Color3.fromRGB(20, 35, 60)
+autoThrowBtn.Text = "Auto Throw: OFF"
+autoThrowBtn.TextColor3 = Color3.fromRGB(220, 235, 255)
+autoThrowBtn.Font = Enum.Font.GothamSemibold
+autoThrowBtn.TextSize = 14
+autoThrowBtn.Parent = mainFrame
+local throwCorner = Instance.new("UICorner")
+throwCorner.CornerRadius = UDim.new(0, 8)
+throwCorner.Parent = autoThrowBtn
+local autoBuyBtn = Instance.new("TextButton")
+autoBuyBtn.Name = "AutoBuyButton"
+autoBuyBtn.Size = UDim2.new(0.86, 0, 0, 42)
+autoBuyBtn.Position = UDim2.new(0.07, 0, 0, 112)
+autoBuyBtn.BackgroundColor3 = Color3.fromRGB(20, 35, 60)
+autoBuyBtn.Text = "Auto Buy: OFF"
+autoBuyBtn.TextColor3 = Color3.fromRGB(220, 235, 255)
+autoBuyBtn.Font = Enum.Font.GothamSemibold
+autoBuyBtn.TextSize = 14
+autoBuyBtn.Parent = mainFrame
+local buyCorner = Instance.new("UICorner")
+buyCorner.CornerRadius = UDim.new(0, 8)
+buyCorner.Parent = autoBuyBtn
+local isAutoThrowing = false
+local isAutoBuying = false
+local colorOff = Color3.fromRGB(20, 35, 60)
+local colorOn = Color3.fromRGB(25, 115, 210)
+openButton.MouseButton1Click:Connect(function()
+	mainFrame.Visible = not mainFrame.Visible
+end)
+autoThrowBtn.MouseButton1Click:Connect(function()
+	isAutoThrowing = not isAutoThrowing
+	if isAutoThrowing then
+		autoThrowBtn.Text = "Auto Throw: ON"
+		autoThrowBtn.BackgroundColor3 = colorOn
+	else
+		autoThrowBtn.Text = "Auto Throw: OFF"
+		autoThrowBtn.BackgroundColor3 = colorOff
+	end
+end)
+task.spawn(function()
+	while true do
+		if isAutoThrowing then
+			local remote = ReplicatedStorage:FindFirstChild("ThrowPlaneEvent")
+			if remote then
+				remote:FireServer()
+			end
+		end
+		task.wait(0.5)
+	end
+end)
+autoBuyBtn.MouseButton1Click:Connect(function()
+	isAutoBuying = not isAutoBuying
+	if isAutoBuying then
+		autoBuyBtn.Text = "Auto Buy: ON"
+		autoBuyBtn.BackgroundColor3 = colorOn
+	else
+		autoBuyBtn.Text = "Auto Buy: OFF"
+		autoBuyBtn.BackgroundColor3 = colorOff
+	end
+end)
+task.spawn(function()
+	while true do
+		if isAutoBuying then
+			local buyRemote = ReplicatedStorage:FindFirstChild("BuyItemEvent")
+			if buyRemote then
+				buyRemote:FireServer("BestItemAvailable")
+			end
+		end
+		task.wait(1)
+	end
+end)
